@@ -1,0 +1,90 @@
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
+
+// ===== CONFIG =====
+const int NUM_SAMPLES = 10;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+
+  mpu.initialize();
+
+  if (!mpu.testConnection()) {
+    Serial.println("MPU FAIL");
+    while (1);
+  }
+
+  Serial.println("MPU READY");
+  Serial.println("Start test...");
+  delay(2000);
+
+  // ===== STAGE 1: 0 DEG =====
+  Serial.println("\n=== STAGE 1: 0 DEG ===");
+  takeSamples();
+
+  Serial.println("WAIT 15s -> move to 90 DEG");
+  delay(15000);
+
+  // ===== STAGE 2: 90 DEG =====
+  Serial.println("\n=== STAGE 2: 90 DEG ===");
+  takeSamples();
+
+  Serial.println("WAIT 15s -> move back to 0 DEG");
+  delay(15000);
+
+  // ===== STAGE 3: 0 DEG AGAIN =====
+  Serial.println("\n=== STAGE 3: BACK TO 0 DEG ===");
+  takeSamples();
+
+  Serial.println("\nDONE TEST");
+}
+
+void loop() {
+  // không dùng loop
+}
+
+void takeSamples() {
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+
+    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+    float Ax = ax / 16384.0;
+    float Ay = ay / 16384.0;
+    float Az = az / 16384.0;
+
+    float Gx = gx / 131.0;
+    float Gy = gy / 131.0;
+    float Gz = gz / 131.0;
+
+    float pitch = atan2(Ax, sqrt(Ay * Ay + Az * Az)) * 180 / PI;
+
+    Serial.print("Sample ");
+    Serial.print(i + 1);
+    Serial.print(": ");
+
+    Serial.print("Ax=");
+    Serial.print(Ax, 3);
+    Serial.print(" Ay=");
+    Serial.print(Ay, 3);
+    Serial.print(" Az=");
+    Serial.print(Az, 3);
+
+    Serial.print(" | Pitch=");
+    Serial.print(pitch, 2);
+
+    Serial.print(" | Gx=");
+    Serial.print(Gx, 2);
+    Serial.print(" Gy=");
+    Serial.print(Gy, 2);
+    Serial.print(" Gz=");
+    Serial.println(Gz, 2);
+
+    delay(300); 
+  }
+}
