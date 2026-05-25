@@ -1,0 +1,230 @@
+/*
+ * MPU6500 / MPU6050 - THI NGHIEM PHAN BO VECTOR g
+ * Arduino Nano
+ * 
+ * Ket noi:
+ * A4 -> SDA
+ * A5 -> SCL
+ * 3.3V -> VCC MPU
+ * GND -> GND MPU
+ * 
+ * Chuc nang:
+ * - Tu dong do 200 mau moi goc
+ * - Dung 5 giay de ban dieu chinh goc tiep theo
+ * - Tinh trung binh Ax, Ay, Az
+ * - Kiem tra |g| = sqrt(Ax² + Ay² + Az²)
+ * - Tinh sai so %
+ */
+
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
+
+// ====== THONG SO ======
+const int NUM_SAMPLES = 200;
+
+// ====== CAC GOC THI NGHIEM ======
+float angleDeg[] = {0, 15, 30, 45, 60, 90};
+
+float axTheory[] = {
+  0.000,
+  0.259,
+  0.500,
+  0.707,
+  0.866,
+  1.000
+};
+
+float ayTheory[] = {
+  0.000,
+  0.000,
+  0.000,
+  0.000,
+  0.000,
+  0.000
+};
+
+float azTheory[] = {
+  1.000,
+  0.966,
+  0.866,
+  0.707,
+  0.500,
+  0.000
+};
+
+const int NUM_ANGLES = 6;
+
+// ====== SCALE ACCEL ======
+// ±2g -> 16384 LSB/g
+const float ACC_SCALE = 16384.0;
+
+// =========================
+
+void setup() {
+
+  Serial.begin(115200);
+  Wire.begin();
+
+  mpu.initialize();
+
+  if (mpu.testConnection()) {
+    Serial.println("MPU READY");
+  } else {
+    Serial.println("MPU ERROR");
+    while (1);
+  }
+
+  Serial.println("\n==============================");
+  Serial.println("THI NGHIEM PHAN BO VECTOR g");
+  Serial.println("==============================\n");
+
+  delay(2000);
+
+  runExperiment();
+}
+
+void loop() {
+}
+
+// =========================
+
+void runExperiment() {
+
+  for (int i = 0; i < NUM_ANGLES; i++) {
+
+    Serial.println("\n========================================");
+    Serial.print("DAT CAM BIEN O GOC: ");
+    Serial.print(angleDeg[i]);
+    Serial.println(" DO");
+    Serial.println("CHO 5 GIAY...");
+    Serial.println("========================================");
+
+    countdown5s();
+
+    float sumAx = 0;
+    float sumAy = 0;
+    float sumAz = 0;
+
+    float sumNorm = 0;
+
+    Serial.println("\nDANG DO 200 MAU...\n");
+
+    for (int j = 0; j < NUM_SAMPLES; j++) {
+
+      int16_t axRaw, ayRaw, azRaw;
+      mpu.getAcceleration(&axRaw, &ayRaw, &azRaw);
+
+      float ax = axRaw / ACC_SCALE;
+      float ay = ayRaw / ACC_SCALE;
+      float az = azRaw / ACC_SCALE;
+
+      float normG = sqrt(ax * ax + ay * ay + az * az);
+
+      sumAx += ax;
+      sumAy += ay;
+      sumAz += az;
+
+      sumNorm += normG;
+
+      delay(10);
+    }
+
+    // ====== GIA TRI TRUNG BINH ======
+    float meanAx = sumAx / NUM_SAMPLES;
+    float meanAy = sumAy / NUM_SAMPLES;
+    float meanAz = sumAz / NUM_SAMPLES;
+
+    float meanNorm = sumNorm / NUM_SAMPLES;
+
+    // ====== TINH SAI SO ======
+    float errorAx =
+      abs(meanAx - axTheory[i]) /
+      abs(axTheory[i] == 0 ? 1 : axTheory[i]) * 100.0;
+
+    float errorAz =
+      abs(meanAz - azTheory[i]) /
+      abs(azTheory[i] == 0 ? 1 : azTheory[i]) * 100.0;
+
+    // ====== HIEN THI ======
+    Serial.println("\n========== KET QUA ==========");
+
+    Serial.print("Goc: ");
+    Serial.print(angleDeg[i]);
+    Serial.println(" do");
+
+    Serial.println("\n--- Gia tri do ---");
+
+    Serial.print("Ax = ");
+    Serial.print(meanAx, 4);
+    Serial.println(" g");
+
+    Serial.print("Ay = ");
+    Serial.print(meanAy, 4);
+    Serial.println(" g");
+
+    Serial.print("Az = ");
+    Serial.print(meanAz, 4);
+    Serial.println(" g");
+
+    Serial.println("\n--- Gia tri ly thuyet ---");
+
+    Serial.print("Ax theory = ");
+    Serial.println(axTheory[i], 4);
+
+    Serial.print("Ay theory = ");
+    Serial.println(ayTheory[i], 4);
+
+    Serial.print("Az theory = ");
+    Serial.println(azTheory[i], 4);
+
+    Serial.println("\n--- Sai so ---");
+
+    Serial.print("Sai so Ax = ");
+    Serial.print(errorAx, 2);
+    Serial.println(" %");
+
+    Serial.print("Sai so Az = ");
+    Serial.print(errorAz, 2);
+    Serial.println(" %");
+
+    Serial.println("\n--- Kiem tra vector g ---");
+
+    Serial.print("|g| = ");
+    Serial.println(meanNorm, 4);
+
+    float normError = abs(meanNorm - 1.0) * 100.0;
+
+    Serial.print("Sai lech |g| = ");
+    Serial.print(normError, 2);
+    Serial.println(" %");
+
+    if (normError > 3.0) {
+      Serial.println("CAN HIEU CHINH LAI GAIN!");
+    } else {
+      Serial.println("DAT YEU CAU");
+    }
+
+    Serial.println("========================================\n");
+
+    delay(3000);
+  }
+
+  Serial.println("\n==============================");
+  Serial.println("HOAN THANH THI NGHIEM");
+  Serial.println("==============================");
+}
+
+// =========================
+
+void countdown5s() {
+
+  for (int i = 15; i > 0; i--) {
+
+    Serial.print(i);
+    Serial.println("...");
+
+    delay(1000);
+  }
+}
