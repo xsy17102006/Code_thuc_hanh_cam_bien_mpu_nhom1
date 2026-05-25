@@ -1,0 +1,69 @@
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
+
+// ===== THRESHOLD SHOCK =====
+const float THRESHOLD = 2.0; // g
+
+// ===== time control =====
+unsigned long lastTime = 0;
+const int sampleInterval = 2000; // ~500Hz (2ms)
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+
+  mpu.initialize();
+
+  if (!mpu.testConnection()) {
+    Serial.println("MPU FAIL");
+    while (1);
+  }
+
+  Serial.println("MPU READY");
+  Serial.println("Ax Ay Az | Gx Gy Gz | |a| | SHOCK");
+}
+
+void loop() {
+  if (micros() - lastTime < sampleInterval) return;
+  lastTime = micros();
+
+  int16_t ax, ay, az;
+  int16_t gx, gy, gz;
+
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+  // ===== convert to g =====
+  float Ax = ax / 16384.0;
+  float Ay = ay / 16384.0;
+  float Az = az / 16384.0;
+
+  // ===== gyro deg/s =====
+  float Gx = gx / 131.0;
+  float Gy = gy / 131.0;
+  float Gz = gz / 131.0;
+
+  // ===== total acceleration magnitude =====
+  float a_total = sqrt(Ax * Ax + Ay * Ay + Az * Az);
+
+  // ===== shock detect =====
+  bool shock = (a_total > THRESHOLD);
+
+  // ===== print data =====
+  Serial.print(Ax, 4); Serial.print("\t");
+  Serial.print(Ay, 4); Serial.print("\t");
+  Serial.print(Az, 4); Serial.print("\t");
+
+  Serial.print(Gx, 2); Serial.print("\t");
+  Serial.print(Gy, 2); Serial.print("\t");
+  Serial.print(Gz, 2); Serial.print("\t");
+
+  Serial.print(a_total, 3); Serial.print("\t");
+
+  if (shock) {
+    Serial.println("SHOCK!");
+  } else {
+    Serial.println("-");
+  }
+}
