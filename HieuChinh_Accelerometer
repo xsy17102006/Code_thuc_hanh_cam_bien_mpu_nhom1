@@ -1,0 +1,123 @@
+/*
+ * DO DU LIEU 3 TRUC MPU6050 / MPU6500
+ * MOI TU THE SE IN RA:
+ * Ax, Ay, Az
+ *
+ * SUA POSITION:
+ * 1 = Z UP
+ * 2 = Z DOWN
+ * 3 = X UP
+ * 4 = X DOWN
+ * 5 = Y UP
+ * 6 = Y DOWN
+ */
+
+#include <Wire.h>
+
+#define MPU_ADDR 0x68
+
+// =========================
+// CHON TU THE
+// =========================
+#define POSITION 6
+
+int16_t Ax, Ay, Az;
+
+// =========================
+void setup() {
+
+  Serial.begin(115200);
+  Wire.begin();
+
+  // Wake up MPU
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+
+  delay(1000);
+
+  printPosition();
+
+  Serial.println("GIU YEN CAM BIEN...");
+  delay(5000);
+
+  measureMeanXYZ();
+}
+
+// =========================
+void loop() {
+}
+
+// =========================
+// DOC ACCEL
+// =========================
+void readAccel() {
+
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+
+  Wire.requestFrom(MPU_ADDR, 6, true);
+
+  Ax = Wire.read() << 8 | Wire.read();
+  Ay = Wire.read() << 8 | Wire.read();
+  Az = Wire.read() << 8 | Wire.read();
+}
+
+// =========================
+// IN TEN TU THE
+// =========================
+void printPosition() {
+
+  Serial.println("\n====================");
+
+  if (POSITION == 1) Serial.println("Z UP");
+  if (POSITION == 2) Serial.println("Z DOWN");
+
+  if (POSITION == 3) Serial.println("X UP");
+  if (POSITION == 4) Serial.println("X DOWN");
+
+  if (POSITION == 5) Serial.println("Y UP");
+  if (POSITION == 6) Serial.println("Y DOWN");
+
+  Serial.println("====================");
+}
+
+// =========================
+// DO TRUNG BINH 200 MAU
+// =========================
+void measureMeanXYZ() {
+
+  long sumAx = 0;
+  long sumAy = 0;
+  long sumAz = 0;
+
+  for (int i = 0; i < 200; i++) {
+
+    readAccel();
+
+    sumAx += Ax;
+    sumAy += Ay;
+    sumAz += Az;
+
+    delay(5);
+  }
+
+  float meanAx = (float)sumAx / 200.0;
+  float meanAy = (float)sumAy / 200.0;
+  float meanAz = (float)sumAz / 200.0;
+
+  Serial.println("\n===== RESULT =====");
+
+  Serial.print("Mean Ax = ");
+  Serial.println(meanAx);
+
+  Serial.print("Mean Ay = ");
+  Serial.println(meanAy);
+
+  Serial.print("Mean Az = ");
+  Serial.println(meanAz);
+
+  Serial.println("==================");
+}
