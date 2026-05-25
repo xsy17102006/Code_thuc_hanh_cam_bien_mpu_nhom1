@@ -1,0 +1,189 @@
+/*
+ * MPU6050 / MPU6500
+ * CALIBRATE GYRO + CHECK AFTER CALIBRATION
+ *
+ * Arduino Nano
+ * SDA -> A4
+ * SCL -> A5
+ */
+
+#include <Wire.h>
+#include <math.h>
+
+#define MPU_ADDR 0x68
+
+int16_t rawAX, rawAY, rawAZ;
+int16_t rawGX, rawGY, rawGZ;
+
+// gyro offset
+float gyro_offset_x = 0;
+float gyro_offset_y = 0;
+float gyro_offset_z = 0;
+
+// ================= READ MPU =================
+void readMPU() {
+
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+
+  Wire.requestFrom(MPU_ADDR, 14, true);
+
+  rawAX = Wire.read() << 8 | Wire.read();
+  rawAY = Wire.read() << 8 | Wire.read();
+  rawAZ = Wire.read() << 8 | Wire.read();
+
+  Wire.read();
+  Wire.read();
+
+  rawGX = Wire.read() << 8 | Wire.read();
+  rawGY = Wire.read() << 8 | Wire.read();
+  rawGZ = Wire.read() << 8 | Wire.read();
+}
+
+// ================= CALIBRATE =================
+void calibrateGyro() {
+
+  double sumGX = 0;
+  double sumGY = 0;
+  double sumGZ = 0;
+
+  Serial.println("GIU YEN CAM BIEN 5 GIAY...");
+  delay(5000);
+
+  // ===== DO 500 MAU =====
+  for (int i = 0; i < 500; i++) {
+
+    readMPU();
+
+    sumGX += rawGX / 131.0;
+    sumGY += rawGY / 131.0;
+    sumGZ += rawGZ / 131.0;
+
+    delay(5);
+  }
+
+  // ===== OFFSET =====
+  gyro_offset_x = sumGX / 500.0;
+  gyro_offset_y = sumGY / 500.0;
+  gyro_offset_z = sumGZ / 500.0;
+
+  Serial.println("\n===== GYRO OFFSET =====");
+
+  Serial.print("gyro_offset_x = ");
+  Serial.println(gyro_offset_x, 6);
+
+  Serial.print("gyro_offset_y = ");
+  Serial.println(gyro_offset_y, 6);
+
+  Serial.print("gyro_offset_z = ");
+  Serial.println(gyro_offset_z, 6);
+}
+
+// ================= CHECK =================
+void checkSensor() {
+
+  double sumGX = 0;
+  double sumGY = 0;
+  double sumGZ = 0;
+
+  double sumA = 0;
+
+  // ===== DO 500 MAU =====
+  for (int i = 0; i < 500; i++) {
+
+    readMPU();
+
+    // gyro sau calibration
+    float gx = rawGX / 131.0 - gyro_offset_x;
+    float gy = rawGY / 131.0 - gyro_offset_y;
+    float gz = rawGZ / 131.0 - gyro_offset_z;
+
+    // accel
+    float ax = rawAX / 16384.0;
+    float ay = rawAY / 16384.0;
+    float az = rawAZ / 16384.0;
+
+    float a_total = sqrt(ax * ax + ay * ay + az * az);
+
+    sumGX += gx;
+    sumGY += gy;
+    sumGZ += gz;
+
+    sumA += a_total;
+
+    delay(5);
+  }
+
+  // ===== MEAN =====
+  float meanGX = sumGX / 500.0;
+  float meanGY = sumGY / 500.0;
+  float meanGZ = sumGZ / 500.0;
+
+  float meanA = sumA / 500.0;
+
+  // ===== PRINT =====
+  Serial.println("\n===== RESULT AFTER CALIBRATION =====");
+
+  Serial.print("Mean GX = ");
+  Serial.print(meanGX, 6);
+  Serial.println(" deg/s");
+
+  Serial.print("Mean GY = ");
+  Serial.print(meanGY, 6);
+  Serial.println(" deg/s");
+
+  Serial.print("Mean GZ = ");
+  Serial.print(meanGZ, 6);
+  Serial.println(" deg/s");
+
+  Serial.print("|a| = ");
+  Serial.print(meanA, 6);
+  Serial.println(" g");
+
+  // ===== CHECK GYRO =====
+  if (abs(meanGX) < 0.05 &&
+      abs(meanGY) < 0.05 &&
+      abs(meanGZ) < 0.05) {
+
+    Serial.println("GYRO OK (<0.05 deg/s)");
+  }
+  else {
+    Serial.println("GYRO CHUA TOT");
+  }
+
+  // ===== CHECK ACC =====
+  if (abs(meanA - 1.0) < 0.05) {
+
+    Serial.println("ACC OK (~1g)");
+  }
+  else {
+    Serial.println("ACC CHUA TOT");
+  }
+}
+
+// ================= SETUP =================
+void setup() {
+
+  Serial.begin(115200);
+
+  Wire.begin();
+
+  // wake up MPU
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+
+  delay(2000);
+
+  calibrateGyro();
+
+  delay(2000);
+
+  checkSensor();
+}
+
+void loop() {
+
+}
